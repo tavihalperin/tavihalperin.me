@@ -1,0 +1,322 @@
+<html>
+<head>
+     <title>motion magnification</title>
+	<link rel="stylesheet" href="lcv.css" type="text/css">
+<style>
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+img {
+  padding: 0em;
+  margin: 0em;
+  border: 0em;
+}
+
+h1 {
+  color: #554422; 
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+  padding: 0em;
+}
+
+p,h1,h2,div.content div {
+  width: auto 
+}
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 5px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>
+
+Implementation of <a href="http://people.csail.mit.edu/nwadhwa/phase-video/"> "Phase Based Video Motion Processing" </a>
+article by Neal Wadhwa, Michael Rubinstein, Fre`do Durand, and William T. Freeman
+</h1>
+<font size="3">
+Phase based motion magnification is a method to magnify (tiny and periodic) motions in a video. For example, this crane video 
+which was taken from their website) looks still, but is actually moving. This method allows emphasizing this motion.
+<br>
+<br>
+
+<iframe width="420" height="315"
+src="http://www.youtube.com/embed/PV7YhmdbNgU">
+</iframe>
+
+<br>
+<br>
+<br>
+Before getting to the paper itself we need some background. 
+
+<h1>
+Steerable pyramid image decomposition
+</h1>
+Each frame in the video is decomposed using complex steerable pyramid before processing changes over time. 
+Steerable Pyramid filter is described <a href="simoncelli 91.pdf"> here </a>, and <a href="simoncelli 99.pdf"> here </a> is 
+a description of <b> complex </b> steerable pyramid filter.
+Those filters are shown below ( in the Fourier domain): 
+<br/><br/>
+<b>Idealized filters </b>( each colour represents a different filter)
+<br/> <img src="idealizedFilters.bmp"> 
+<br/><br/><br/>
+<b>The real filters look like this: examples of four bands, two levels filters </b>
+
+ <br/><img src="actualFilter1.bmp"> <img src="actualFilter2.bmp"> <img src="actualFilter3.bmp">  <img src="actualFilter4.bmp"> 
+ <br/><img src="actualFilter5.bmp"> <img src="actualFilter6.bmp"> <img src="actualFilter7.bmp">  <img src="actualFilter8.bmp"> 
+<br/><br/><br/><br/>
+
+Those filters are based on 2D Gabor wavelet filter, which is a complex sinusoid enveloped by a Gaussian,
+with the form (in the spatial domain):
+<br><img src="eq1.png">    is the frequency of the sinusoid. <br><br>
+<!psi(omega) = e^(-1/sigma^2) * e^(i*omega)
+
+omega = (omega1, omega2) ><Br>
+The Fourier transform of the filter is:
+<br><img src="eq3.png"><br><br><img src="eq4.png"><br><br><br>
+<!(psi(omega)) is psi(omega)^ = F(e^(-1/sigma^2)) ** F(e^(i*omega)) = e^(sigma) ** delta(omega) = e^(sigma-omega) 
+(** is convolution)>
+
+But, if we want perfect reconstruction with those filters, we must define the filters a little differently. 
+We define them in the Fourier domain, so that 
+<br><br><img src="eq5.png"><br><br><br>
+<!sum(|S^|^2) = const>
+
+<br/>
+There are two more filters: <br>
+<ul><li> the high pass filter, which filters the "corners" of the Fourier transform. 
+It is the residual around the highest frequency band pass filter.
+<li> the low pass filter. After filtering all the directed bands, the centre of the Fourier spectrum (the area with the lowest
+ frequencies) is left.
+</ul>
+ 
+both of them are real, since they are symmetric around (0,0) in the Fourier domain. so that the imaginary parts of their responses are zero.
+<br/><br/><br>
+Below is an example image and it's decomposition with 4 band and 2 levels pyramid. 
+Each directional filter response is complex so the real and imaginary parts are displayed separately.
+
+<br><br>
+Original image
+<br/><img src="original.jpg">
+<br><br>
+High pass residual
+<br/><img src="high.bmp">
+
+<br><br>
+First level
+<br/><img src="2real.bmp"><img src="2imag.bmp">
+<br/><img src="3real.bmp"><img src="3imag.bmp">
+<br/><img src="4real.bmp"><img src="4imag.bmp">
+<br/><img src="5real.bmp"><img src="5imag.bmp">
+
+<br><br>
+Second level
+<br/><img src="6real.bmp"><img src="6imag.bmp">
+<br/><img src="7real.bmp"><img src="7imag.bmp">
+<br/><img src="8real.bmp"><img src="8imag.bmp">
+<br/><img src="9real.bmp"><img src="9imag.bmp">
+
+<br><br>
+Low pass residual
+<br/><img src="low.bmp">
+
+<br><br><br><br>
+We can also separate the magnitude and phase of a filter response, for example for the first filter from the second level above
+
+<br><br>
+<br/><img src="mag.bmp"><img src="phase.bmp">
+</font>
+<br><br>
+<h1>
+Reconstruction
+</h1>
+<font size="3">
+The reconstruction is done with the same filters, but we only use the real part of each band. For every directed filter the response for image <font size="5">I</font> is 
+<!B=S^*I^ (I^ is the Fourier transform of I)>
+<br><br><img src="eq6.png"><br><br>
+Therefore the reconstruction of the image is given by
+<br><br><img src="eq7.png"><br><br>
+And in the spatial domain
+<br><br><img src="eq8.png"><br><br>
+For every pixel (x,y) in the image
+<br><br><img src="eq9.png"><br><br>
+where <img src="eq10.png"> is complex, so we can take the phase or magnitude separately and manipulate them over time.<!so I = sum(I^*(psi^)^2).>
+
+<br>
+<!each band S^ = I^*psi^, can be expressed in the spatial domain as S(omega) = I**psi = A(omega)*exp(i*omega*x), 
+where x is the spatial location>
+
+<h1>
+Temporal filtering
+</h1>
+We want to detect and amplify changes over time. First, motion. Since each frame can be decomposed into directed bands,
+We process each band separately in the spatial domain. By the Fourier shift theorem, change in spatial position corresponds 
+to change in phase of the bands, but in the case of the steerable pyramid filters the change in phase is <b> local </b>
+ around the moving object. This means that amplifying phase changes over time will magnify local motion. This process will not 
+change the intensity, as the absolute value of the filter response does not change. I took the crane video the authors of this work
+ supplied and 
+amplified it's motion x50 using temporal ideal bandpass filter, with cut-off frequencies 0.2-0.4 Hz(as they suggested in the paper). 
+Here are the results (using pyramid with 7 levels and 7 bands ):
+
+<br><br><br>
+<iframe width="420" height="315"
+src="http://www.youtube.com/embed/gx-20JGBlaI">
+</iframe>
+
+<br><br>
+
+Intensity changes are harder to manipulate. I used their <a href = "vidmag.pdf" >older paper</a>, which uses gaussian 
+pyramid to manipulate pixels, instead of steerable pyramid. To amplifying changes in intensity, only the magnitude 
+should be manipulated. In addition, in this case the lowest spatial frequency components are important, and we only deal with
+real valued variables (magnitude), so the low pass residual can and should be processed with the rest of the bands. 
+Another technical issue is avoiding 
+the 2 upper (finer) pyramid levels, to reduce noise amplification (the lower the frequency the less noise it has).
+After tuning the parameters I managed to get some results, on the videos that were published with the paper. Using, again, temporal
+ideal bandpass filter. every frame was decomposed using 2 bands, and 6 levels filters. We don't need many bands because we are 
+not interested in the motion.
+
+<br><br><br>
+original video
+<br>
+<iframe width="420" height="315"
+src="http://www.youtube.com/embed/TnYDfo4WFow">
+</iframe>
+ 
+<br><br><br>
+
+intensity magnification x75, with cut-off frequencies: 2.33-2.66 Hz
+
+<br>
+<iframe width="420" height="315"
+src="http://www.youtube.com/embed/hAPJXntlrb8">
+</iframe>
+
+<br><br>
+
+<br><br><br>
+original video
+<br>
+<iframe width="420" height="315"
+src="http://www.youtube.com/embed/SZdSyBUEasA">
+</iframe>
+ 
+<br><br><br>
+
+intensity magnification x40, with cut-off frequencies: 0.83-1 Hz
+
+<br>
+<iframe width="420" height="315"
+src="http://www.youtube.com/embed/7GjNMr93HP8">
+</iframe>
+
+<br><br>
+
+I tried to use a video of my own, but though it appears there is very little movement in the video, 
+there is still too much movement for the intensity magnification process 
+to handle correctly, and the artifacts become too big, regardless of the temporal frequency chosen.
+ For example:
+
+<br><br><br>
+original video
+<br>
+<iframe width="420" height="315"
+src="http://www.youtube.com/embed/oWyH_Y6SbRA">
+</iframe>
+ 
+<br><br><br>
+
+intensity magnification x50, with cut-off frequencies: 0.83-1 Hz
+
+<br>
+<iframe width="420" height="315"
+src="http://www.youtube.com/embed/SrtnNUltGn0">
+</iframe>
+
+<br><br>
+
+
+
+
+
+This is nice, But the next question one would ask is how to find the desired temporal frequency, the one that has interesting 
+information? 
+One way is to look at the (temporal) fourier domain and choose the frequency that corresponds to the coefficient 
+with the largest absolute value, for every pixel. This should somehow measure how much information this frequency has.
+The problem with this approach is that in almost every pixel the absolute value of the coefficients decays exponentially with the 
+height of the frequency, so almost always it will give us one of the low frequencies.
+
+(even when assuming the DC component is subtracted, if it is not subtracted the lowest frequency will always be chosen). 
+A second, and better way is to look at local peaks in the fourier representation, 
+and pick one frequency for the entire video, using voting.
+The idea is that if something is happening in the video, a large amount of pixels should change together, with the same frequency, and 
+there would be enough of them in which this frequency will be significant.
+I tried it on the first two videos above. For the face video it gave me exactly the frequency I used before, but for the baby
+it gave me another one:
+<br><br>
+The frequency this algorithm chose was 0.92 Hz
+<br>
+<iframe width="420" height="315"
+src="http://www.youtube.com/embed/0PgJqBcx5Jc">
+</iframe>
+
+<br><br>
+
+It appears that the intensity changes of the baby's breathing is more significant than his blood flow.
+<br><br>
+
+But this method is still not robust, as it "looks under the street light". The second attempt was to use the fact that many
+pixels respond to the same change <b> together </b> at the same time. For example, with the blood flow, the pixels are ascending 
+and descending together. It means that a frequency with meaningful information will have almost the same (temporal) phase in many 
+different pixels. For every frequency, when the coefficients from all the pixels (from all scales and orientations)
+are added together, the absolute value of the result depends highly on how much the pixels agree with each other on the phase of 
+this frequency. If the pixels agree on the phase of some frequency, summing the coefficients and then taking absolute value of the 
+result should be
+approximately the same as taking absolute value of every coefficient and then summing them up.
+<br><br>Essentially this is the difference between <img src="eq11.png">
+<!abs(sum(a(x,y,omega))) and sum(abs(a(x,y,omega)))>. 
+<br>But, if we look at a frequency for which the pixels do not respond 
+to some real world feature, the phases for this frequency are scattered arbitrarily therefore cancelling each other, 
+and the sum of the coefficients should have low absolute value.
+The method I used to measure the correspondence between pixels is 
+<br><br><img src="eq12.png"><br><br>
+notice that <img src="eq13.png"><br><br>
+ <!abs(sum(a(x,y,omega)))/sum(abs(a(x,y,omega))) which is always in [0,1].> 
+<br>
+Results for the face video:
+<br>
+<br><br><img src="plot.bmp"><br><br>
+
+<br><br>
+It is clearly seen that one frequency has much better correspondence (in phase) between the pixels, above all the rest. 
+This is the frequency of the heart rate of the man in the video, 0.92Hz (about 55 times a minute).
+</font></body>
+
